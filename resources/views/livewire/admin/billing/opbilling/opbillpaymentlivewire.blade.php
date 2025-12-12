@@ -1,0 +1,207 @@
+<div class="card">
+    @if ($opbillingdata)
+        <div class="card-header text-white theme_bg_color d-flex justify-content-between">
+            <div class="h5 mb-0">
+                OP BILL PAYMENT | #{{ $opbillingdata->patient->uhid }}</div>
+            <div class="h5 mb-0">
+                <span class="text-warning fw-bold">NAME :</span> {{ $opbillingdata->patient->name }}
+                |
+                <span class="text-warning fw-bold">AGE :</span> {{ $opbillingdata->patient->age ?? '-' }}|
+                <span class="text-warning fw-bold">GENDER :</span>
+                {{ $opbillingdata->patient->gender ? Config::get('archive.gender')[$opbillingdata->patient->gender] : '-' }}|
+
+                <span class="text-warning fw-bold">PHONE :</span>
+                {{ $opbillingdata->patient->phone }}
+            </div>
+
+        </div>
+
+        <div class="card-body p-0 m-0">
+
+            <div class="table-responsive px-2 mt-1">
+                <table class="table table-bordered shadow-sm table-success text-center w-100">
+                    <thead class="fw-bold " style="font-size: 16px;">
+                        <tr>
+                            <th scope="col">Visit ID</th>
+                            <th scope="col">OP Billing ID</th>
+                            <th scope="col">Sub Total</th>
+                            <th scope="col">Discount</th>
+                            <th scope="col">Total</th>
+                            <th scope="col">Bill Disc/Cancel</th>
+                            <th scope="col">Net Value</th>
+                            <th scope="col">Patient Excess Paid</th>
+                            <th scope="col">Patient to Pay</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="fs-5">
+                            <td>{{ $opbillingdata->patientvisit->uniqid }}</td>
+                            <td>{{ $opbillingdata->uniqid }}</td>
+                            <td>{{ $opbillingdata->opbillinglist->sum('sub_total') }}</td>
+                            <td>{{ $opbillingdata->opbillinglist->sum('discount') }}</td>
+                            <td>{{ $opbillingdata->opbillinglist->sum('total') }}</td>
+                            <td>{{ $opbillingdata->opbillinglist->sum('billdiscount_amount') }}</td>
+                            <td>{{ $opbillingdata->opbillinglist->sum('grand_total') }}</td>
+                            <td>{{ $balance < 0 ? abs($balance) : 0 }}</td>
+                            <td>{{ $balance > 0 ? $balance : 0 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card m-4">
+                <div class="card-header text-white theme_bg_color">
+                    Bill Payment
+                    @can('Opbill')
+                        <a href="{{ route('opbillingaddservice', $opbillingdata->uuid) }}"
+                            class="btn btn-sm btn-primary float-end">Billing Screen</a>
+                    @endcan
+                </div>
+                <div class="card-body">
+                    <form wire:submit.prevent="storereceipt" autocomplete="off">
+                        <div class="row g-3">
+                            @include('helper.formhelper.form', [
+                                'type' => 'select',
+                                'fieldname' => 'payment_type',
+                                'labelname' => 'PAYMENT TYPE',
+                                'labelidname' => 'paymenttypeid',
+                                'default_option' => 'Select Type',
+                                'option' => config('archive.payment_type'),
+                                'required' => true,
+                                'col' => 'col-md-4',
+                            ])
+                            @include('helper.formhelper.form', [
+                                'type' => 'number',
+                                'fieldname' => 'received_amount',
+                                'labelname' => 'AMOUNT',
+                                'labelidname' => 'receivedamountid',
+                                'required' => true,
+                                'col' => 'col-md-4',
+                            ])
+                            @include('helper.formhelper.form', [
+                                'type' => 'select',
+                                'fieldname' => 'modeofpayment',
+                                'labelname' => 'PAYMENT MODE',
+                                'labelidname' => 'modeofpaymentid',
+                                'default_option' => 'Select Mode',
+                                'option' => $modeofpaymentdata,
+                                'required' => true,
+                                'col' => 'col-md-4',
+                            ])
+
+                            @if ($modeofpayment != 1 && $modeofpayment != null)
+                                <div class="col-md-4">
+                                    <label for="paymentrefid" class="form-label">
+                                        @if ($modeofpayment == 4)
+                                            CHEQUE NO
+                                        @elseif($modeofpayment == 5)
+                                            DD NO
+                                        @else
+                                            PAYMENT REF ID
+                                        @endif
+                                    </label>
+                                    <input wire:model.lazy="payment_ref_id" type="text" class="form-control"
+                                        id="paymentrefid">
+                                    @error('payment_ref_id')
+                                        <span class="text-danger">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                                @if ($modeofpayment != 6)
+                                    @include('helper.formhelper.form', [
+                                        'type' => 'text',
+                                        'fieldname' => 'bank_name',
+                                        'labelname' => 'BANK NAME',
+                                        'labelidname' => 'banknameid',
+                                        'required' => false,
+                                        'col' => 'col-md-4',
+                                    ])
+                                @endif
+                                @include('helper.formhelper.form', [
+                                    'type' => 'date',
+                                    'fieldname' => 'payment_date',
+                                    'labelname' => 'PAYMENT DATE',
+                                    'labelidname' => 'paymentdateid',
+                                    'required' => false,
+                                    'col' => 'col-md-4',
+                                ])
+                            @endif
+                            @include('helper.formhelper.form', [
+                                'type' => 'textarea',
+                                'fieldname' => 'note',
+                                'labelname' => 'NOTE',
+                                'labelidname' => 'noteid',
+                                'required' => false,
+                                'col' => 'col-md-4',
+                            ])
+                        </div>
+                        <div class="text-center mt-4">
+                            <a href="" class="btn btn-secondary">Cancel</a>
+                            @include('admin.common.formsubmitbtnhelper.formsubmitbtnhelper', [
+                                'method_name' => 'storereceipt',
+                                'model_id' => '',
+                            ])
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="card m-4">
+                <div class="card-header text-white theme_bg_color">Receipt Lists</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped p-0 m-0">
+                            <thead class="table-success">
+                                <tr>
+                                    <th scope="col">S.No</th>
+                                    <th scope="col">Receipt ID</th>
+                                    <th scope="col">Payment Type</th>
+                                    <th scope="col">Paid Amount</th>
+                                    <th scope="col">Payment Mode</th>
+                                    <th scope="col">Ref. ID</th>
+                                    <th scope="col">Note</th>
+                                    <th scope="col">Print Receipt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if ($opreceiptdata)
+                                    @if ($opreceiptdata->isNotEmpty())
+                                        @foreach ($opreceiptdata as $key => $eachreceiptdata)
+                                            <tr>
+                                                <td>{{ $key + 1 }}</td>
+                                                <td>{{ $eachreceiptdata->hms_uniqid }}</td>
+                                                <td>{{ config('archive.payment_type')[$eachreceiptdata->payment_type] }}
+                                                </td>
+                                                <td>{{ $eachreceiptdata->received_amount }}</td>
+                                                @if ($eachreceiptdata->payment_type == 1)
+                                                    <td>{{ config('archive.modeofpayment')[$eachreceiptdata->modeofpayment] }}
+                                                    </td>
+                                                @else
+                                                    <td>{{ config('archive.modeofpayment')[$eachreceiptdata->modeofpayment] }}
+                                                    </td>
+                                                @endif
+                                                <td>{{ $eachreceiptdata->payment_ref_id ?? '-' }}</td>
+                                                <td>{{ $eachreceiptdata->note ?? '-' }}</td>
+                                                <td>
+                                                    <button wire:click="printopreceipt({{ $eachreceiptdata->id }})"
+                                                        class="btn btn-sm btn-success"><i
+                                                            class="bi bi-printer"></i></button>
+                                                    {{-- <button
+                                                        wire:click="downloadoppaymentreceipt({{ $eachreceiptdata->id }})"
+                                                        class="btn btn-sm btn-warning"><i
+                                                            class="bi bi-file-earmark-pdf"></i></button> --}}
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    @else
+                                        <tr>
+                                            <td colspan="9" class="text-center">No Record Found</td>
+                                        </tr>
+                                    @endif
+                                @endif
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    @endif
+</div>
